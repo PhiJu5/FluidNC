@@ -607,6 +607,8 @@ void report_realtime_status(Channel& channel) {
 #endif
     msg << ">";
     // The destructor sends the line when msg goes out of scope
+    for (auto l : Listeners::SysListenerFactory::objects())
+        l->newStatus();
 }
 
 void hex_msg(uint8_t* buf, const char* prefix, size_t len) {

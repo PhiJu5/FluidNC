@@ -1,80 +1,105 @@
-#if 0
-#    include "RGBLed.h"
-
-#    include "System.h"
+#include "Platform.h"
+#include "RGBLed.h"
+#include "System.h"
 
 namespace Listeners {
-    RGBLed::RGBLed() : SysListener("rgbled") {}
+    RGBLed::RGBLed(const char *c) : SysListener("rgbled") {}
+
+    void RGBLed::newStatus() {
+        static State prevState = (State)-1;
+        uint32_t stColor = statusFlip ? this->status : 0;
+
+        if (!initDone )
+            return;
+        log_verbose("RGB:stColor=" << getColor(stColor));
+        setColor(1, stColor);
+        pixels_->show();
+        if (prevState != sys.state())
+             handleLed(SystemDirty::All);
+        prevState = sys.state();
+        statusFlip = !statusFlip;
+    }
 
     void RGBLed::init() {
-        log_info("Initializing RGB Led on gpio " << pin_ << ", index " << index_);
-
-        if (this->pin_.defined()) {
+        if (this->pin_.defined() && number_) {
             auto thepin = this->pin_.getNative(Pin::Capabilities::Native | Pin::Capabilities::Output);
-
-            pixels_ = new Adafruit_NeoPixel(index_ + 1, thepin, NEO_GRB + NEO_KHZ800);
+            log_debug("RGB Led gpio " << pin_ << ", number " << number_);
+            pixels_ = new Adafruit_NeoPixel(4, thepin, NEO_GRB + NEO_KHZ800);
             pixels_->begin();
-            pixels_->clear();
-            pixels_->setPixelColor(0, pixels_->Color(32, 0, 0));  // Booting is dark red. You have no choice in the matter.
-            pixels_->show();
-
+            pixels_->setBrightness(brightness_ & 0xFF);
+            pixels_->show(); // Initialize all pixels to 'off'
             sys.register_change_handler(handleChange, this);
+            initDone = true;
         }
     }
 
-    void RGBLed::handleChangeDetail(SystemDirty changes, const system_t& state) {
-        if ((int(changes) & int(SystemDirty::State)) != 0) {
-            uint32_t index = index_;
-            int32_t value = -1;
-
-            switch (state.state()) {
-                case State::Idle:
-                    value = this->idle;
-                    break;
-                case State::Alarm:
-                    value = this->alarm;
-                    break;
-                case State::CheckMode:
-                    value = this->checkMode;
-                    break;
-                case State::Homing:
-                    value = this->homing;
-                    break;
-                case State::Cycle:
-                    value = this->cycle;
-                    break;
-                case State::Hold:
-                    value = this->hold;
-                    break;
-                case State::Jog:
-                    value = this->jog;
-                    break;
-                case State::SafetyDoor:
-                    value = this->safetyDoor;
-                    break;
-                case State::Sleep:
-                    value = this->sleep;
-                    break;
-                case State::ConfigAlarm:
-                    value = this->configAlarm;
-                    break;
-                default:
-                    value = -1;
-                    break;
-            }
-
-            // log_info("Updating RGB led to " << (value < 0 ? "none" : getColor(value)));
-
-            if (value >= 0) {
-                pixels_->setPixelColor(index, pixels_->Color((value >> 16) & 0xFF, (value >> 8) & 0xFF, value & 0xFF));
-                pixels_->show();
-            }
+    void RGBLed::handleLed(SystemDirty changes) {
+        uint32_t i = 2;
+        uint32_t color = 0;
+        //  2 1
+        //  3 0
+        //   |
+        //  wire
+        if (!initDone )
+          return;
+        log_debug("RGB" << (changes == SystemDirty::All ? ":" : ":changes=") << int(changes) << ":state=" << int(sys.state()));
+        pixels_->clear();
+        
+        switch (sys.state()) {
+            case State::Idle: // 0
+                color = this->idle;
+                break;
+            case State::Alarm: // 1
+                i = 3;
+                color = this->alarm;
+                break;
+             case State::CheckMode: // 2
+                color = this->checkMode;
+                break;
+             case State::Homing: // 3
+                color = this->homing;
+                break;
+             case State::Cycle: // 4
+                color = this->cycle;
+                break;
+             case State::Hold: // 5
+                color = this->hold;
+                break;
+             case State::Held: // 6
+                color = this->held;
+                break;
+             case State::Jog: // 7
+                color = this->jog;
+                break;
+             case State::SafetyDoor: // 8
+                i = 0;
+                color = this->safetyDoor;
+                break;
+             case State::Sleep: // 9
+                color = this->sleep;
+                break;
+             case State::ConfigAlarm: // 10
+                i = 3;
+                color = this->configAlarm;
+                break;
+             case State::Critical: // 11
+                i = 3;
+                color = this->critical;
+                break;
+            case State::Starting: // 12
+                color = this->starting;
+                break;
+            default:
+                color = this->none;
+            break;
         }
+        log_debug("RGB:" << i << ":" << getColor(color));
+        setColor(i, color);
+        pixels_->show();
     }
-
     // Configuration registration
     namespace {
         SysListenerFactory::InstanceBuilder<RGBLed> registration("rgbled");
     }
 }
-#endif
+
