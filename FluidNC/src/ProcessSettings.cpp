@@ -279,6 +279,12 @@ static Error disable_alarm_lock(const char* value, AuthenticationLevel auth_leve
     config->_macros->_after_unlock.run(&out);
     return Error::Ok;
 }
+
+static Error do_soft_reset(const char* value, AuthenticationLevel auth_level, Channel& out) {
+    protocol_send_event(&rtResetEvent);
+    return Error::Ok;
+}
+
 static Error report_ngc(const char* value, AuthenticationLevel auth_level, Channel& out) {
     report_ngc_parameters(out);
     return Error::Ok;
@@ -979,6 +985,7 @@ void make_user_commands() {
     new UserCommand("E", "Errors/List", listErrors, anyState);
     new UserCommand("C", "GCode/Check", toggle_check_mode, anyState);
     new UserCommand("X", "Alarm/Disable", disable_alarm_lock, anyState);
+    new UserCommand("SSR", "System/SoftReset", do_soft_reset, anyState);
     new UserCommand("NVX", "Settings/Erase", Setting::eraseNVS, notIdleOrAlarm, WA);
     new UserCommand("V", "Settings/Stats", Setting::report_nvs_stats, notIdleOrAlarm);
     new UserCommand("#", "GCode/Offsets", report_ngc, notIdleOrAlarm);
