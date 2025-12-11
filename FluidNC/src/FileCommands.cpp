@@ -548,6 +548,18 @@ static Error showLocalFSHashes(const char* parameter, AuthenticationLevel auth_l
     return Error::Ok;
 }
 
+static Error copyFile(const char* parameter, AuthenticationLevel auth_level, Channel& out) {  // No ESP command
+    char *from = (char *)parameter;
+    char *to;
+
+    to = strchr(parameter, ':');
+    if (to) {
+        *to = '\0';
+        to++;
+    }
+    return copyFile(from, to, out);
+}
+
 static Error backupLocalFS(const char* parameter, AuthenticationLevel auth_level, Channel& out) {  // No ESP command
     return copyDir("/localfs", "/sd/localfs", out);
 }
@@ -674,6 +686,6 @@ void make_file_commands() {
     new WebCommand("path", WEBCMD, WU, NULL, "Files/ListGCode", listGCodeFiles);
     new UserCommand("XR", "Xmodem/Receive", xmodem_receive, allowConfigStates);
     new UserCommand("XS", "Xmodem/Send", xmodem_send, allowConfigStates);
-
+    new WebCommand("path", WEBCMD, WU, NULL, "Files/Copy", copyFile);
     new WebCommand("RESTART", WEBCMD, WA, NULL, "Bye", restart);
 }
