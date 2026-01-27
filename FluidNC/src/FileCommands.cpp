@@ -559,14 +559,36 @@ static Error showLocalFSHashes(const char* parameter, AuthenticationLevel auth_l
 
 static Error copyFile(const char* parameter, AuthenticationLevel auth_level, Channel& out) {  // No ESP command
     char *from = (char *)parameter;
-    char *to;
+    char *to = strchr(parameter, ':');
+    int f = 0;
+    int t = 0;
 
-    to = strchr(parameter, ':');
     if (to) {
         *to = '\0';
         to++;
     }
-    return copyFile(from, to, out);
+    if (strstr(from, "/localfs")) {
+        f = 1;
+        from = strstr(from, "/localfs");
+    }
+    if (strstr(from, "/sd")) {
+        f = 2;
+        from = strstr(from, "/sd");
+    }
+    if (strstr(to, "/localfs")) {
+        t = 1;
+        to = strstr(to, "/localfs");
+    }
+    if (strstr(to, "/sd")) {
+        t = 2;
+        to = strstr(to, "/sd");
+    }
+    if (!f)
+        f = 1;
+    if (!t)
+        t = 2;
+    // $Files/Copy=/localfs/Macro2.nc:/sd/Macro2.nc
+    return copyFile(f == 1 ? LocalFS : SD, from, t == 1 ? LocalFS : SD, to, out);
 }
 
 static Error backupLocalFS(const char* parameter, AuthenticationLevel auth_level, Channel& out) {  // No ESP command
