@@ -557,6 +557,41 @@ static Error showLocalFSHashes(const char* parameter, AuthenticationLevel auth_l
     return Error::Ok;
 }
 
+static Error copyFile(const char* parameter, AuthenticationLevel auth_level, Channel& out) {  // No ESP command
+    char *from = (char *)parameter;
+    char *to = strchr(parameter, ':');
+    static const char lfs[] = "/localfs";
+    static const char sds[] = "/sd";
+    int f = 0;
+    int t = 0;
+
+    if (to)
+        *to++ = '\0';
+    if (strstr(from, lfs)) {
+        f = 1;
+        from = strstr(from, lfs) + strlen(lfs);
+    } else {
+        if (strstr(from, sds)) {
+            f = 2;
+            from = strstr(from, sds) + strlen(sds);
+        }
+    }
+    if (strstr(to, lfs)) {
+        t = 1;
+        to = strstr(to, lfs) + strlen(lfs);;
+    } else {
+        if (strstr(to, sds)) {
+            t = 2;
+            to = strstr(to, sds) + strlen(sds);
+        }
+    }
+    if (!f || !t) {
+        log_error("syntax is $Files/Copy=[/localfs|/sd]/file1:[/localfs|/sd]file2");
+        return Error::InvalidValue;
+    }
+    return copyFile(f == 1 ? LocalFS : SD, from, t == 1 ? LocalFS : SD, to, out);
+}
+
 static Error backupLocalFS(const char* parameter, AuthenticationLevel auth_level, Channel& out) {  // No ESP command
     return copyDir(LocalFS, "/", SD, "/localfs_copy", out);
 }
@@ -683,6 +718,6 @@ void make_file_commands() {
     new WebCommand("path", WEBCMD, WU, NULL, "Files/ListGCode", listGCodeFiles);
     new UserCommand("XR", "Xmodem/Receive", xmodem_receive, allowConfigStates);
     new UserCommand("XS", "Xmodem/Send", xmodem_send, allowConfigStates);
-
+    new WebCommand("path", WEBCMD, WU, NULL, "Files/Copy", copyFile);
     new WebCommand("RESTART", WEBCMD, WA, NULL, "Bye", restart);
 }

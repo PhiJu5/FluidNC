@@ -8,9 +8,11 @@
 namespace Listeners {
     class RGBLed : public SysListener {
         Adafruit_NeoPixel* pixels_ = nullptr;
-
         Pin      pin_;
-        uint32_t index_ = 0;
+        uint32_t number_ = 0;
+        uint32_t brightness_ = 32;
+        bool initDone = false;
+        bool statusFlip = false;
 
         std::string getColor(int32_t value) {
             if (value == -1) {
@@ -53,22 +55,32 @@ namespace Listeners {
             return v;
         }
 
-        void handleChangeDetail(SystemDirty changes, const system_t& state);
+        void handleChangeDetail(SystemDirty changes, const system_t& state) {
+            handleLed(changes);
+        }
+
+        void handleLed(SystemDirty change);
 
         static void handleChange(SystemDirty changes, const system_t& state, void* userData) {
             static_cast<RGBLed*>(userData)->handleChangeDetail(changes, state);
         }
 
-        uint32_t idle        = 0x007F00;
-        uint32_t alarm       = 0x7F0000;
-        uint32_t checkMode   = 0xb936bf;
-        uint32_t homing      = 0x501f00;
-        uint32_t cycle       = 0x7f4422;
-        uint32_t hold        = 0x777744;
-        uint32_t jog         = 0x007f3f;
-        uint32_t safetyDoor  = 0x3f7f00;
-        uint32_t sleep       = 0x001F00;
-        uint32_t configAlarm = 0x7f0000;
+        // https://github.com/FastLED/FastLED/wiki/Pixel-reference
+        uint32_t idle        = 0x0000FF; // Blue
+        uint32_t alarm       = 0xFF0000; // Red
+        uint32_t checkMode   = 0xFFC0CB; // Pink,  G-code check mode, locks out planner and motion only
+        uint32_t homing      = 0xFFFF00; // Yellow
+        uint32_t cycle       = 0x00FF00; // Green, Run
+        uint32_t hold        = 0xFFA500; // Orange
+        uint32_t held        = 0xFF8C00; // DarkOrange, feedhold complete
+        uint32_t jog         = 0x800080; // Purple
+        uint32_t safetyDoor  = 0xFF00FF; // Magenta
+        uint32_t sleep       = 0xD2691E; // Chocolate
+        uint32_t configAlarm = 0xC71585; // MediumVioletRed, You can't do anything but fix your config file
+        uint32_t critical    = 0xFF0000; // Red, You can't do anything, reset with CTRL-x or the reset button
+        uint32_t starting    = 0x40E0D0; // Turquoise
+        uint32_t none        = 0xFFFFFF; // White
+        uint32_t status      = 0x00FFFF; // Cyan
 
         void handleRGBString(Configuration::HandlerBase& handler, const char* name, uint32_t& value) {
             auto        old = value;
@@ -77,12 +89,17 @@ namespace Listeners {
             value = parseColor(str, old);
         }
 
-    public:
-        RGBLed();
+        void setColor(uint32_t i, int32_t color) {
+            pixels_->setPixelColor(i, pixels_->Color((color >> 16) & 0xFF, (color >> 8) & 0xFF, color & 0xFF));
+        }
 
+    public:
+        RGBLed(const char *c);
+        void statusLed(void);
         virtual void group(Configuration::HandlerBase& handler) override {
             handler.item("pin", pin_);
-            handler.item("index", index_);
+            handler.item("number", number_);
+            handler.item("brightness", brightness_);
 
             handleRGBString(handler, "idle", idle);
             handleRGBString(handler, "alarm", alarm);
@@ -90,12 +107,18 @@ namespace Listeners {
             handleRGBString(handler, "homing", homing);
             handleRGBString(handler, "cycle", cycle);
             handleRGBString(handler, "hold", hold);
+            handleRGBString(handler, "held", held);
             handleRGBString(handler, "jog", jog);
             handleRGBString(handler, "safetyDoor", safetyDoor);
             handleRGBString(handler, "sleep", sleep);
             handleRGBString(handler, "configAlarm", configAlarm);
+            handleRGBString(handler, "critical", critical);
+            handleRGBString(handler, "starting", starting);
+            handleRGBString(handler, "none", none);
+            handleRGBString(handler, "status", status);
         }
 
         void init() override;
+        void newStatus() override;
     };
 }

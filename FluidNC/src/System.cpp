@@ -142,6 +142,8 @@ const std::map<State, const char*> StateName = {
 
 void set_state(State s) {
     sys.set_state(s);
+    for (auto l : Listeners::SysListenerFactory::objects())
+        l->newStatus();
 }
 bool state_is(State s) {
     return sys.state() == s;
