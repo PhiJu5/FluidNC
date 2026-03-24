@@ -65,7 +65,9 @@ public:
 
     void deinit() override { ArduinoOTA.end(); }
 
-    void poll() override { ArduinoOTA.handle(); }
+    void poll() override {
+        //ArduinoOTA.handle();
+    }
 
     ~OTA() {}
 };

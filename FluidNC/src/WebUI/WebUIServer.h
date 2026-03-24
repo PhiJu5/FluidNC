@@ -11,6 +11,7 @@
 #include "Authentication.h"  // AuthenticationLevel
 
 #include <freertos/task.h>
+#include <WiFi.h>
 
 class AsyncWebSocket;
 class AsyncWebServer;
@@ -59,6 +60,7 @@ namespace WebUI {
         ~WebUI_Server();
 
     private:
+        static void getWifiMode();
         static bool                       _setupdone;
         static AsyncWebServer*            _webserver;
         static AsyncHeaderFreeMiddleware* _headerFilter;

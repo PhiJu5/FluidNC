@@ -60,6 +60,7 @@ namespace WebUI {
     uint16_t WebUI_Server::_port                 = 0;
     bool     WebUI_Server::_schedule_reboot      = false;
     uint32_t WebUI_Server::_schedule_reboot_time = 0;
+    wifi_mode_t _lastMode = WIFI_MODE_NULL;
 
     UploadStatus               WebUI_Server::_upload_status   = UploadStatus::NONE;
     AsyncWebServer*            WebUI_Server::_webserver       = NULL;
@@ -82,6 +83,16 @@ namespace WebUI {
         deinit();
     }
 
+    void WebUI_Server::getWifiMode() {
+        static int64_t _nextModeCheck = 0;
+        static const int64_t ModeCheckTimeout = 2000000; // uSec
+
+        if (esp_timer_get_time() > _nextModeCheck) {
+            _nextModeCheck = esp_timer_get_time() + ModeCheckTimeout;
+            _lastMode      = WiFi.getMode();
+        }
+    }
+
     void WebUI_Server::init() {
         http_port   = new IntSetting("HTTP Port", WEBSET, WA, "ESP121", "HTTP/Port", DEFAULT_HTTP_PORT, MIN_HTTP_PORT, MAX_HTTP_PORT);
         http_enable = new EnumSetting("HTTP Enable", WEBSET, WA, "ESP120", "HTTP/Enable", DEFAULT_HTTP_STATE, &onoffOptions);
@@ -95,7 +106,8 @@ namespace WebUI {
 
         _setupdone = false;
 
-        if (WiFi.getMode() == WIFI_OFF || !http_enable->get()) {
+        getWifiMode();
+        if (_lastMode == WIFI_OFF || !http_enable->get()) {
             return;
         }
 
@@ -188,7 +200,8 @@ namespace WebUI {
         _webserver->on("/upload", HTTP_ANY, handle_direct_SDFileList, SDFileUpload);
         //_webserver->on("/SD", HTTP_ANY, handle_SDCARD);
 
-        if (WiFi.getMode() == WIFI_AP) {
+        getWifiMode();
+        if (_lastMode == WIFI_AP) {
             // if DNSServer is started with "*" for domain name, it will reply with
             // provided IP to all DNS request
             dnsServer.start(DNS_PORT, "*", WiFi.softAPIP());
@@ -398,7 +411,8 @@ namespace WebUI {
         return true;
     }
     void WebUI_Server::sendWithOurAddress(AsyncWebServerRequest* request, const char* content, uint16_t code) {
-        auto        ip    = WiFi.getMode() == WIFI_STA ? WiFi.localIP() : WiFi.softAPIP();
+        getWifiMode();
+        auto ip    = _lastMode == WIFI_STA ? WiFi.localIP() : WiFi.softAPIP();
         std::string ipstr = IP_string(ip);
         if (_port != 80) {
             ipstr += ":";
@@ -469,7 +483,8 @@ namespace WebUI {
             return;
         }
 
-        if (WiFi.getMode() == WIFI_AP) {
+        getWifiMode();
+        if (_lastMode == WIFI_AP) {
             sendCaptivePortal(request);
             return;
         }
@@ -1257,7 +1272,9 @@ namespace WebUI {
 
     void WebUI_Server::poll() {
         static uint32_t start_time = millis();
-        if (WiFi.getMode() == WIFI_AP) {
+
+        getWifiMode();
+        if (_lastMode == WIFI_AP) {
             dnsServer.processNextRequest();
         }
         if (_schedule_reboot and _schedule_reboot_time == millis()) {
