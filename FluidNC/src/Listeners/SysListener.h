@@ -17,6 +17,7 @@ namespace Listeners {
         virtual void init() {}
         virtual void beforeVariableReset() {}
         virtual void afterVariableReset() {}
+        virtual void newStatus() {}
     };
 
     using SysListenerFactory = Configuration::GenericFactory<SysListener>;
