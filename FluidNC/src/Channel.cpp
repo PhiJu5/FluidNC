@@ -9,6 +9,7 @@
 #include "Limit.h"
 #include "Logging.h"
 #include "Job.h"
+#include "Protocol.h"  // poll_task_drain_one_message()
 #include <string_view>
 #include <algorithm>
 
@@ -24,6 +25,14 @@ namespace {
         for (uint32_t attempt = 0; attempt < message_queue_max_retries; ++attempt) {
             if (xQueueSend(message_queue, &msg, message_queue_retry_ticks)) {
                 return true;
+            }
+            // If this is the polling task, it is also the drainer: blocking on
+            // the queue it is supposed to empty would deadlock.  Ship one
+            // queued message ourselves to make room, then retry immediately.
+            if (poll_task_drain_one_message()) {
+                if (xQueueSend(message_queue, &msg, 0)) {
+                    return true;
+                }
             }
         }
 
@@ -284,11 +293,20 @@ void Channel::autoReport() {
     }
 }
 
+std::map<int, InputPin*> Channel::_virtual_pins;
+
 void Channel::pin_event(pinnum_t pinnum, bool active) {
-    try {
-        auto input_pin = _pins.at(pinnum);
+    InputPin* input_pin = nullptr;
+    if (auto it = _pins.find(pinnum); it != _pins.end()) {
+        input_pin = it->second;
+    } else if (auto it = _virtual_pins.find(pinnum); it != _virtual_pins.end()) {
+        input_pin = it->second;
+    }
+    if (input_pin) {
         protocol_send_event(active ? &pinActiveEvent : &pinInactiveEvent, input_pin);
-    } catch (const std::out_of_range& e) { log_error("Unregistered event from channel pin " << (int)pinnum); }
+    } else {
+        log_error("Unregistered event from channel pin " << (int)pinnum);
+    }
 }
 
 void Channel::handleRealtimeCharacter(uint8_t ch) {
@@ -405,6 +423,10 @@ void Channel::ready() {}
 
 void Channel::registerEvent(pinnum_t pinnum, InputPin* obj) {
     _pins[pinnum] = obj;
+}
+
+void Channel::registerVirtualPin(pinnum_t pinnum, InputPin* obj) {
+    _virtual_pins[pinnum] = obj;
 }
 
 void Channel::ack(Error status) {
