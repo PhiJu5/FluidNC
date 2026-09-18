@@ -154,6 +154,10 @@ void set_state(State s) {
         sys.set_state(s);
         allChannels.notifyState();
     }
+#if SUPPORT_LISTENERS
+    for (auto l : Listeners::SysListenerFactory::objects())
+        l->newStatus();
+#endif
 }
 bool IRAM_ATTR state_is(State s) {
     return sys.state() == s;
